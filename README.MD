@@ -1,5 +1,20 @@
 # A Simple and Fast Implementation of Faster R-CNN
 
+## 0. Update:
+This repo support feature extraction using Faster R-CNN! It is forked and improved from the [simple-faster-rcnn-pytorch](https://github.com/chenyuntc/simple-faster-rcnn-pytorch).
+
+To extract ROI features of a single image, run the `extract_features.py` with function `demo()`:
+```shell
+python extract_features.py demo
+```
+
+To extract ROI features of the whole VOC2007 dataset, run the `extract_features.py` with function `run()`:
+```shell
+python extract_features.py run --env fasterrcnn --split test --save_dir /ssd/VOC2007/VOC2007_Results
+```
+For detailed configurations, please take a look at `./utils/config.py`.
+
+
 ## 1. Introduction
 
 **[Update:]** I've further simplified the code to pytorch 1.5, torchvision 0.6, and replace the customized ops roipool and nms with the one from torchvision.  if you want the old version code, please checkout branch [v1.0](https://github.com/chenyuntc/simple-faster-rcnn-pytorch/tree/v1.0)
