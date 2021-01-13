@@ -119,19 +119,22 @@ class RegionProposalNetwork(nn.Module):
 
         rois = list()
         roi_indices = list()
+        roi_scores = list()
         for i in range(n):
-            roi = self.proposal_layer(
+            roi, roi_score = self.proposal_layer(
                 rpn_locs[i].cpu().data.numpy(),
                 rpn_fg_scores[i].cpu().data.numpy(),
                 anchor, img_size,
-                scale=scale)
+                scale=scale)  # (300, 4)
             batch_index = i * np.ones((len(roi),), dtype=np.int32)
             rois.append(roi)
             roi_indices.append(batch_index)
+            roi_scores.append(roi_score)
 
         rois = np.concatenate(rois, axis=0)
         roi_indices = np.concatenate(roi_indices, axis=0)
-        return rpn_locs, rpn_scores, rois, roi_indices, anchor
+        roi_scores = np.concatenate(roi_scores, axis=0)
+        return rpn_locs, rpn_scores, rois, roi_indices, roi_scores, anchor
 
 
 def _enumerate_shifted_anchor(anchor_base, feat_stride, height, width):

@@ -115,7 +115,7 @@ class VGG16RoIHead(nn.Module):
         self.spatial_scale = spatial_scale
         self.roi = RoIPool( (self.roi_size, self.roi_size),self.spatial_scale)
 
-    def forward(self, x, rois, roi_indices):
+    def forward(self, x, rois, roi_indices, get_feature=False):
         """Forward the chain.
 
         We assume that there are :math:`N` batches.
@@ -145,7 +145,9 @@ class VGG16RoIHead(nn.Module):
         fc7 = self.classifier(pool)
         roi_cls_locs = self.cls_loc(fc7)
         roi_scores = self.score(fc7)
-        return roi_cls_locs, roi_scores
+        if get_feature:
+            return roi_cls_locs, roi_scores, fc7
+        return roi_cls_locs, roi_scores, None
 
 
 def normal_init(m, mean, stddev, truncated=False):

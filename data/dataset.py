@@ -127,3 +127,18 @@ class TestDataset:
 
     def __len__(self):
         return len(self.db)
+
+
+class NewTestDataset:
+    def __init__(self, opt, split='test', use_difficult=True):
+        self.opt = opt
+        self.db = VOCBboxDataset(opt.voc_data_dir, split=split, use_difficult=use_difficult)
+
+    def __getitem__(self, idx):
+        ori_img, bbox, label, difficult = self.db.get_example(idx)
+        img = preprocess(ori_img)
+        name = int(self.db.ids[idx])
+        return img, ori_img.shape[1:], bbox, label, difficult, name
+
+    def __len__(self):
+        return len(self.db)

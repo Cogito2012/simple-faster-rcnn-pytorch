@@ -6,12 +6,15 @@ from pprint import pprint
 # e.g. --voc-data-dir='./data/'
 
 class Config:
+    # result path
+    save_dir = '/tmp/results'
     # data
-    voc_data_dir = '/dataset/PASCAL2007/VOC2007/'
+    voc_data_dir = '/ssd/VOC2007/VOCdevkit/VOC2007'
     min_size = 600  # image resize
     max_size = 1000 # image resize
     num_workers = 8
     test_num_workers = 8
+    split = 'test'
 
     # sigma for l1_smooth_loss
     rpn_sigma = 3.

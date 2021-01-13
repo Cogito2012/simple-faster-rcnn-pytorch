@@ -87,7 +87,7 @@ class FasterRCNN(nn.Module):
         # Total number of classes including the background.
         return self.head.n_class
 
-    def forward(self, x, scale=1.):
+    def forward(self, x, scale=1., get_feature=False):
         """Forward Faster R-CNN.
 
         Scaling paramter :obj:`scale` is used by RPN to determine the
@@ -127,11 +127,11 @@ class FasterRCNN(nn.Module):
         img_size = x.shape[2:]
 
         h = self.extractor(x)
-        rpn_locs, rpn_scores, rois, roi_indices, anchor = \
+        rpn_locs, rpn_scores, rois, roi_indices, roi_scores, anchor = \
             self.rpn(h, img_size, scale)
-        roi_cls_locs, roi_scores = self.head(
-            h, rois, roi_indices)
-        return roi_cls_locs, roi_scores, rois, roi_indices
+        roi_cls_locs, roi_cls_scores, fc7 = self.head(
+            h, rois, roi_indices, get_feature=get_feature)
+        return roi_cls_locs, roi_cls_scores, rois, roi_indices, roi_scores, fc7
 
     def use_preset(self, preset):
         """Use the given preset during prediction.
@@ -182,6 +182,36 @@ class FasterRCNN(nn.Module):
         label = np.concatenate(label, axis=0).astype(np.int32)
         score = np.concatenate(score, axis=0).astype(np.float32)
         return bbox, label, score
+
+    def _topN(self, roi, roi_rpn_scores, fc7, nms_thresh=0.6, topN=50):
+        """roi, size=(300, 4), cuda tensor
+           roi_rpn_scores, size=(300,), numpy array
+           fc7, size=(300, 4096), cuda tensor
+        """
+        # inds = np.argsort(roi_rpn_scores)  # ascending sort
+        # keep_top = inds[-topN:]  # get the topN score indices (last topN values)
+        # apply nms
+        keep = nms(roi, at.totensor(roi_rpn_scores), nms_thresh)
+        keep = keep.cpu().numpy()
+        if keep.shape[0] > topN:
+            candidate_scores = roi_rpn_scores[keep]
+            inds = np.argsort(candidate_scores)  # ascending sort
+            keep_top = keep[inds[-topN:]]
+        else:
+            # if too less, compensate with the rest (topN-len(keep)) results
+            keep_all = list(range(roi.size(0)))
+            keep_rest = list(set(keep_all) - set(list(keep)))
+            candidate_scores = roi_rpn_scores[keep_rest]
+            inds = np.argsort(candidate_scores)  # ascending sort
+            keep_rest = np.array(keep_rest)
+            rest = keep_rest[inds[-(topN-keep.shape[0]):]]
+            keep_top = np.concatenate((rest, keep), axis=0)
+        # select top-N results
+        score_topn = roi_rpn_scores[keep_top]
+        roi_topn = roi[keep_top].cpu().numpy()
+        feature_topn = fc7[keep_top].cpu().numpy()
+
+        return roi_topn, score_topn, feature_topn
 
     @nograd
     def predict(self, imgs,sizes=None,visualize=False):
@@ -264,6 +294,26 @@ class FasterRCNN(nn.Module):
         self.use_preset('evaluate')
         self.train()
         return bboxes, labels, scores
+
+    @nograd
+    def get_roi_features(self, img, nms_thresh=0.6, topN=50):
+        """Extract features of topN rois"""
+        self.eval()
+        size = img.shape[1:]
+        img = at.totensor(img[None]).float()
+        scale = img.shape[3] / size[1]
+        roi_cls_loc, roi_scores, rois, _, roi_rpn_scores, fc7 = self(img, scale=scale, get_feature=True)
+        # We are assuming that batch size is 1.
+        roi_score = roi_scores.data
+        roi_cls_loc = roi_cls_loc.data  # (300, 84)
+        roi = at.totensor(rois) / scale
+
+        # Here we directly use ROI rather than cls_bbox!!!
+        roi_topn, score_topn, feature_topn = self._topN(roi, roi_rpn_scores, fc7, nms_thresh=nms_thresh, topN=topN)
+
+        self.use_preset('evaluate')
+        return roi_topn, score_topn, feature_topn
+
 
     def get_optimizer(self):
         """
